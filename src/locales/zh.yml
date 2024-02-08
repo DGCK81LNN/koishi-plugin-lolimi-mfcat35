@@ -1,0 +1,6 @@
+commands:
+  mfcat35:
+    description: AI 对话
+    usage: 在群聊中 @ 机器人或私聊机器人（指令除外）或在消息开头加冒号都可以触发 AI 对话。
+    arguments:
+      text: 文本
