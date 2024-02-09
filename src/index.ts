@@ -41,7 +41,7 @@ function getConfiguredNickname(ctx: Context) {
 export function apply(ctx: Context, config: Config) {
   const nickname = getConfiguredNickname(ctx)
   const logger = ctx.logger("mfcat35")
-    ctx.i18n.define("zh", require("./locales/zh"))
+  ctx.i18n.define("zh", require("./locales/zh"))
 
   const cmd = ctx.command("mfcat35 <text:text>")
   cmd.action(async ({ session }, text) => {
@@ -61,11 +61,12 @@ export function apply(ctx: Context, config: Config) {
   })
 
   ctx.middleware((session, next) => {
-    let ok = session.isDirect
+    let implicit = session.isDirect
+    let explicit = false
     let content = h
       .transform(session.elements, {
         at: e => {
-          if (e.id === session.bot.selfId) ok = true
+          if (e.id === session.bot.selfId) implicit = true
           return `@${e.type || e.name || e.id}`
         },
         sharp: e => `#${e.name || e.id}`,
@@ -85,15 +86,20 @@ export function apply(ctx: Context, config: Config) {
 
     for (const prefix of config.prefix) {
       if (content.startsWith(prefix)) {
-        ok = true
+        if (prefix) explicit = true
+        else implicit = true
         content = content.slice(prefix.length).trimStart()
         break
       }
     }
 
-    if (!ok) return next()
-
-    logger.debug("temporary middleware " + inspect(content))
-    return next(next => cmd.execute({ args: [content] }, next))
+    if (explicit) {
+      return cmd.execute({ args: [content] }, next)
+    }
+    if (implicit) {
+      logger.debug("temporary middleware " + inspect(content))
+      return next(next => cmd.execute({ args: [content] }, next))
+    }
+    return next()
   })
 }
