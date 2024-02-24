@@ -57,32 +57,37 @@ export function apply(ctx: Context, config: Config) {
       responseType: "text",
     })
     logger.debug("response " + inspect(response))
-    return response
+    return h.escape(response)
   })
 
   ctx.middleware((session, next) => {
-    let implicit = session.isDirect
-    let explicit = false
-    let content = h
-      .transform(session.elements, {
+    function sanitizeInput(elements: h[]): h[] {
+      return h.transform(elements, {
         at: e => {
           if (e.id === session.bot.selfId) implicit = true
           return `@${e.type || e.name || e.id}`
         },
+        author: e => `${e.name || e.id} said: `,
         sharp: e => `#${e.name || e.id}`,
-        a: (e, children) => `[${children.join("")}](${e.href})`,
+        a: (e, children) => ["[", ...sanitizeInput(children), "](", h.text(e.href), ")"],
         image: "[Image]",
         img: "[Image]",
-        audio: "[Attachment]",
-        video: "[Attachment]",
+        audio: "[Audio message]",
+        video: "[Video]",
         file: "[Attachment]",
         br: "\n",
-        p: (_, children) => `\n${children.join("")}\n`,
-        message: (_, children) => `\n${children.join("")}\n`,
+        p: (_, children) => ["\n", ...sanitizeInput(children), "\n"],
+        message: (_, children) => ["\n", ...sanitizeInput(children), "\n"],
         face: "[Emoji]",
+        text: true,
+        default: (_, children) => sanitizeInput(children),
       })
-      .toString()
-      .trim()
+    }
+
+    let implicit = session.isDirect
+    let explicit = false
+    let content = sanitizeInput(session.elements).toString().trim()
+    if (!content) return next()
 
     for (const prefix of config.prefix) {
       if (content.startsWith(prefix)) {
