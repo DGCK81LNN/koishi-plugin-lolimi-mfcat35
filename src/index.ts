@@ -61,30 +61,44 @@ export function apply(ctx: Context, config: Config) {
   })
 
   ctx.middleware((session, next) => {
-    function sanitizeInput(elements: h[]): h[] {
-      return h.transform(elements, {
-        at: e => {
-          if (e.id === session.bot.selfId) implicit = true
-          return `@${e.type || e.name || e.id}`
+    function sanitizeInput(elements: h[]): Promise<h[]> {
+      return h.transformAsync(elements, {
+        at: async e => {
+          const name =
+            e.type ||
+            (await session.bot.getUser(session.userId)).name ||
+            (
+              !session.isDirect &&
+              (await session.bot.getGuildMember(session.guildId, session.userId))
+            ).name ||
+            e.name ||
+            e.id
+          return `@${name}`
         },
         author: e => `${e.name || e.id} said: `,
         sharp: e => `#${e.name || e.id}`,
-        a: (e, children) => ["[", ...sanitizeInput(children), "](", h.text(e.href), ")"],
+        a: async (e, children) => [
+          "[",
+          ...(await sanitizeInput(children)),
+          "](",
+          h.text(e.href),
+          ")",
+        ],
         image: "[Image]",
         img: "[Image]",
         audio: "[Audio message]",
         video: "[Video]",
         file: "[Attachment]",
         br: "\n",
-        p: (_, children) => ["\n", ...sanitizeInput(children), "\n"],
-        message: (_, children) => ["\n", ...sanitizeInput(children), "\n"],
+        p: async (_, children) => ["\n", ...(await sanitizeInput(children)), "\n"],
+        message: async (_, children) => ["\n", ...(await sanitizeInput(children)), "\n"],
         face: "[Emoji]",
         text: true,
         default: (_, children) => sanitizeInput(children),
       })
     }
 
-    let implicit = session.isDirect
+    let implicit = session.isDirect || session.stripped.appel
     let explicit = false
     let content = sanitizeInput(session.elements).toString().trim()
     if (!content) return next()
