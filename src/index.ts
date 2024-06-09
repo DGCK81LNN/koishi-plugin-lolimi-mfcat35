@@ -60,17 +60,21 @@ export function apply(ctx: Context, config: Config) {
     return h.escape(response)
   })
 
-  ctx.middleware((session, next) => {
+  ctx.middleware(async (session, next) => {
     function sanitizeInput(elements: h[]): Promise<h[]> {
       return h.transformAsync(elements, {
         at: async e => {
           const name =
             e.type ||
-            (await session.bot.getUser(session.userId)).name ||
-            (
-              !session.isDirect &&
-              (await session.bot.getGuildMember(session.guildId, session.userId))
-            ).name ||
+            (await session.bot.getUser(e.id).then(
+              u => u.name,
+              () => ""
+            )) ||
+            (!session.isDirect &&
+              (await session.bot.getGuildMember(session.guildId, e.id).then(
+                u => u.name,
+                () => ""
+              ))) ||
             e.name ||
             e.id
           return `@${name}`
@@ -92,7 +96,7 @@ export function apply(ctx: Context, config: Config) {
         br: "\n",
         p: async (_, children) => ["\n", ...(await sanitizeInput(children)), "\n"],
         message: async (_, children) => ["\n", ...(await sanitizeInput(children)), "\n"],
-        face: "[Emoji]",
+        face: e => (e.name ? `[${e.name} Emoji]` : "[Emoji]"),
         text: true,
         default: (_, children) => sanitizeInput(children),
       })
@@ -100,7 +104,7 @@ export function apply(ctx: Context, config: Config) {
 
     let implicit = session.isDirect || session.stripped.appel
     let explicit = false
-    let content = sanitizeInput(session.elements).toString().trim()
+    let content = (await sanitizeInput(session.elements)).join("").trim()
     if (!content) return next()
 
     for (const prefix of config.prefix) {
