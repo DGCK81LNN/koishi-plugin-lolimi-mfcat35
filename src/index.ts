@@ -7,6 +7,7 @@ export interface Config {
   prompt: string
   prefix: string[]
   apiUrl: string
+  failureKeywords: string[]
 }
 
 export const Config: Schema<Config> = Schema.object({
@@ -30,6 +31,16 @@ export const Config: Schema<Config> = Schema.object({
     .description("API URL。提示词和用户输入文本将分别以 URL 参数 sx 和 msg 传递。")
     .default("https://api.lolimi.cn/API/AI/mfcat3.5.php")
     .role("textarea"),
+  failureKeywords: Schema.array(String)
+    .description(
+      "接口返回的内容包含这些字符串之一时，视为请求失败；此时只要不是直接显式调用 mfcat35 指令，都会静默返回空字符串，只在日志中记录具体结果。"
+    )
+    .default([
+      "ApiKey账户余额不足",
+      "Insufficient account balance",
+      "无效的 API Key",
+      "输出错误请联系站长",
+    ]),
 })
 
 function getConfiguredNickname(ctx: Context) {
@@ -44,7 +55,7 @@ export function apply(ctx: Context, config: Config) {
   ctx.i18n.define("zh", require("./locales/zh"))
 
   const cmd = ctx.command("mfcat35 <text:text>")
-  cmd.action(async ({ session }, text) => {
+  cmd.action(async ({ session, root }, text) => {
     logger.debug("input " + inspect(text))
     const response = await ctx.http.get(config.apiUrl, {
       params: {
@@ -56,7 +67,12 @@ export function apply(ctx: Context, config: Config) {
       },
       responseType: "text",
     })
-    logger.debug("response " + inspect(response))
+    if (config.failureKeywords.some(k => response.includes(k))) {
+      logger.error("error response " + inspect(response))
+      if (!root) return ""
+    } else {
+      logger.debug("response " + inspect(response))
+    }
     return h.escape(response)
   })
 
