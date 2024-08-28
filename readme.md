@@ -1,3 +1,5 @@
+本插件目前停止维护；推荐您使用 [chatluna](https://chatluna.chat)。
+
 # @dgck81lnn/koishi-plugin-lolimi-mfcat35
 
 [![npm](https://img.shields.io/npm/v/@dgck81lnn/koishi-plugin-lolimi-mfcat35?style=flat-square)](https://www.npmjs.com/package/@dgck81lnn/koishi-plugin-lolimi-mfcat35)
